@@ -7,8 +7,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          for z in *.zip; do unzip -q -o "$z"; done
-          for d in */; do [ -d "$d/patch" ] && cp -rf "$d/patch" . ; done
+          python3 - <<'PY'
+          import glob, os, zipfile
+          for zf in glob.glob('*.zip'):
+              print('unzip', zf)
+              with zipfile.ZipFile(zf) as z:
+                  for info in z.infolist():
+                      name = info.filename.replace('\\', '/')
+                      if name.endswith('/'):
+                          os.makedirs(name, exist_ok=True)
+                          continue
+                      d = os.path.dirname(name)
+                      if d:
+                          os.makedirs(d, exist_ok=True)
+                      with z.open(info) as src, open(name, 'wb') as out:
+                          out.write(src.read())
+          PY
           test -d patch
       - uses: actions/setup-java@v4
         with:
@@ -26,7 +40,7 @@ jobs:
           ./gradlew android:assembleDebug --no-daemon --stacktrace
       - run: |
           SRC=$(ls -d shattered-pixel-dungeon-* | head -1)
-          APK=$(find "$SRC/android/build/outputs/apk" -name "*.apk" | head -1)
+          APK=$(find "$SRC/android/outputs" "$SRC/android/build/outputs" -name "*.apk" 2>/dev/null | head -1)
           cp "$APK" abyss-expansion-android.apk
       - uses: actions/upload-artifact@v4
         with:
