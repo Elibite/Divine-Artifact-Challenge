@@ -1,0 +1,52 @@
+name: build-apk
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: kit
+        run: |
+          set -e
+          ls -la
+          for z in kit.zip *.zip; do [ -f "$z" ] && unzip -q -o "$z" || true; done
+          for d in */; do [ -d "$d/patch" ] && cp -rf "$d/patch" . || true; done
+          test -d patch
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: src
+        run: |
+          curl -L --retry 3 -o spd.zip https://github.com/00-Evan/shattered-pixel-dungeon/archive/refs/tags/v4.0.2.zip
+          unzip -q spd.zip
+          echo "SRC=$(ls -d shattered-pixel-dungeon-* | head -n1)" >> $GITHUB_ENV
+      - name: patch
+        run: |
+          cp -rf patch/core/src/main/java/* "$SRC/core/src/main/java/"
+          mkdir -p "$SRC/core/src/main/assets"
+          cp -rf patch/core/src/main/assets/* "$SRC/core/src/main/assets/"
+          for p in "mod_misc.properties:misc.properties" "mod_misc_zh.properties:misc_zh.properties"; do
+            s="patch/core/src/main/assets/messages/misc/${p%%:*}"
+            d="$SRC/core/src/main/assets/messages/misc/${p##*:}"
+            if [ -f "$s" ] && [ -f "$d" ]; then cat "$s" >> "$d"; fi
+          done
+      - name: build
+        working-directory: ${{ env.SRC }}
+        run: |
+          chmod +x gradlew
+          ./gradlew android:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          test ${PIPESTATUS[0]} -eq 0
+      - name: errors
+        if: failure()
+        run: grep -E "error:|错误:" build.log | head -60 || true
+      - name: apk
+        run: |
+          APK=$(find "$SRC/android/build/outputs/apk" -name "*.apk" | head -n1)
+          cp "$APK" abyss-expansion-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: abyss-expansion-apk
+          path: abyss-expansion-android.apk
