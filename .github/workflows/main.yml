@@ -9,7 +9,6 @@ jobs:
       - name: kit
         run: |
           set -e
-          ls -la
           for z in kit.zip *.zip; do [ -f "$z" ] && unzip -q -o "$z" || true; done
           for d in */; do [ -d "$d/patch" ] && cp -rf "$d/patch" . || true; done
           test -d patch
