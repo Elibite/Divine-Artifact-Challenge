@@ -24,14 +24,17 @@ jobs:
                           out.write(src.read())
           PY
           test -d patch
+      - uses: actions/checkout@v4
+        with:
+          repository: 00-Evan/shattered-pixel-dungeon
+          ref: v4.0.2
+          path: spd-src
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
       - run: |
-          curl -L -o spd.zip https://github.com/00-Evan/shattered-pixel-dungeon/archive/refs/tags/v4.0.2.zip
-          unzip -q spd.zip
-          SRC=$(ls -d shattered-pixel-dungeon-* | head -1)
+          SRC=spd-src
           cp -rf patch/core/src/main/java/* "$SRC/core/src/main/java/"
           mkdir -p "$SRC/core/src/main/assets"
           cp -rf patch/core/src/main/assets/* "$SRC/core/src/main/assets/"
@@ -39,8 +42,8 @@ jobs:
           chmod +x gradlew
           ./gradlew android:assembleDebug --no-daemon --stacktrace
       - run: |
-          SRC=$(ls -d shattered-pixel-dungeon-* | head -1)
-          APK=$(find "$SRC/android/outputs" "$SRC/android/build/outputs" -name "*.apk" 2>/dev/null | head -1)
+          APK=$(find spd-src/android/build/outputs/apk -name "*.apk" | head -1)
+          echo "APK=$APK"
           cp "$APK" abyss-expansion-android.apk
       - uses: actions/upload-artifact@v4
         with:
