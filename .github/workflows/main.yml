@@ -33,14 +33,34 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - run: |
+      - name: env
+        run: |
+          java -version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" 2>/dev/null || echo "no platforms dir"
+          ls "$ANDROID_HOME/build-tools" 2>/dev/null || echo "no build-tools dir"
+      - name: build
+        run: |
           SRC=spd-src
           cp -rf patch/core/src/main/java/* "$SRC/core/src/main/java/"
           mkdir -p "$SRC/core/src/main/assets"
           cp -rf patch/core/src/main/assets/* "$SRC/core/src/main/assets/"
           cd "$SRC"
           chmod +x gradlew
-          ./gradlew android:assembleDebug --no-daemon --stacktrace
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          set +e
+          ./gradlew android:assembleDebug --no-daemon 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          echo "gradle exit=$code"
+          if [ $code -ne 0 ]; then
+            echo "=========== What went wrong ==========="
+            grep -A 30 "What went wrong" build.log | head -60
+            echo "=========== javac errors ==========="
+            grep -E "error:|error;|错误" build.log | head -60
+            echo "=========== last 40 lines ==========="
+            tail -40 build.log
+          fi
+          exit $code
       - run: |
           APK=$(find spd-src/android/build/outputs/apk -name "*.apk" | head -1)
           echo "APK=$APK"
